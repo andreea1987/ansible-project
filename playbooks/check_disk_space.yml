@@ -1,0 +1,29 @@
+- name: Check Disk Space and Notify via msmtp
+  hosts: all
+  become: yes
+  vars:
+    threshold: 80  # Disk usage threshold in percentage
+    email_recipient: "balauca_andreea@yahoo.com"  # Your email address
+  tasks:
+    - name: Get disk usage
+      shell: df -h / | tail -1 | awk '{print $5}' | sed 's/%//'
+      register: disk_usage
+
+    - name: Debug disk usage (for testing)
+      debug:
+        msg: "Disk usage is {{ disk_usage.stdout }}%"
+
+    - name: Check if disk usage exceeds threshold
+      fail:
+        msg: "Disk usage exceeds {{ threshold }}% on {{ inventory_hostname }}!"
+      when: disk_usage.stdout | int > threshold
+
+    - name: Send email if disk usage exceeds threshold
+      shell: |
+        echo "To: {{ email_recipient }}
+        Subject: Disk Space Alert on {{ inventory_hostname }}
+        
+        Disk usage on {{ inventory_hostname }} has exceeded the threshold of {{ threshold }}%.
+        Current usage: {{ disk_usage.stdout }}%." | msmtp --from=default -t
+      when: disk_usage.stdout | int > threshold
+
